@@ -2,10 +2,14 @@
 
 import unittest
 
+# pip3 install schwifty
+import re
+import schwifty
+
 # python3 -m unittest IBANBICFilter.TestIBANBICFilter
 class TestIBANBICFilter(unittest.TestCase):
-    def get_test_case(self, spaces_at=[]):
-        test_case = "IBAN: DE12123456781234567890 BIC: COBADEHD055"
+    def get_test_case(self, beginning='', spaces_at=[]):
+        test_case = "\"" + beginning + "IBAN: DE87123456781234567890 BIC: COBADEHD055\""
 
         spaces_at.sort()
         spaces_at.reverse()
@@ -21,7 +25,7 @@ class TestIBANBICFilter(unittest.TestCase):
         expected_string = self.get_test_case()
         index_of_space = expected_string.index("IBAN: ") + len("IBAN: ") + 1
 
-        actual_string = ibanBICFilter.filter(self.get_test_case([index_of_space]))
+        actual_string = ibanBICFilter.filter(self.get_test_case(spaces_at=[index_of_space]))
         self.assertEqual(expected_string, actual_string)
 
     def test_filter_removes_spaces_in_BIC(self):
@@ -30,7 +34,7 @@ class TestIBANBICFilter(unittest.TestCase):
         expected_string = self.get_test_case()
         index_of_space = expected_string.index("BIC: ") + len("BIC: ") + 1
         
-        actual_string = ibanBICFilter.filter(self.get_test_case([index_of_space]))
+        actual_string = ibanBICFilter.filter(self.get_test_case(spaces_at=[index_of_space]))
         self.assertEqual(expected_string, actual_string)
 
     def test_leaves_glibberish_intact(self):
@@ -39,11 +43,11 @@ class TestIBANBICFilter(unittest.TestCase):
         glibberish = 'Any kind of string at the beginning BIC: IBAN: BIC: ' 
 
         spaces_at = []
-        spaces_at.append(self.get_test_case().index("IBAN: ") + len("IBAN: ") + 1)
-        spaces_at.append(self.get_test_case().index("BIC: ") + len("BIC: ") + 1)
+        spaces_at.append(self.get_test_case(glibberish).rindex("IBAN: ") + len("IBAN: ") + 1)
+        spaces_at.append(self.get_test_case(glibberish).rindex("BIC: ") + len("BIC: ") + 1)
 
-        string = glibberish + self.get_test_case(spaces_at)
-        expected_string =  glibberish + self.get_test_case()
+        string = self.get_test_case(glibberish, spaces_at)
+        expected_string =  self.get_test_case(glibberish)
 
         actual_string = ibanBICFilter.filter(string)
         self.assertEqual(expected_string, actual_string)
@@ -51,38 +55,41 @@ class TestIBANBICFilter(unittest.TestCase):
 
 class IBANBICFilter():
     def filter(self, line):
-        resulting_line = ''
-        tokens = line.split(' ')
+        resulting_line = line
 
-        is_first_token = True
-        skip_spaces_until_number_of_characters_read = 0
-        for token in tokens:
-            if not is_first_token and not skip_spaces_until_number_of_characters_read:
-                resulting_line += ' '
+        match = re.search('".*IBAN: (.*) BIC: ((\\w\\s?){11}|(\\w\\s?){8})"', resulting_line)
 
-            if token.find('BIC:') == 0:
-                resulting_line += 'BIC: '
-                token = token[len('BIC: '):]
-                
-                # BIC consists of 8 non-space-characters
-                skip_spaces_until_number_of_characters_read = 8
+        if not match is None and len(match.groups()) >= 2:
+           # replace bic
+            span = match.span(2)
+            index = span[0]
+            end_index = span[1]
 
-            if token.find('IBAN:') == 0:
-                resulting_line += 'IBAN: '
-                token = token[len('BIC: '):]
+            try:
+                # raises exception if BIC can not be parsed
+                bic = schwifty.BIC(match.group(2))
 
-                # IBAN consists of 22 non-space-characters
-                skip_spaces_until_number_of_characters_read = 22
+                # replace BIC string with compact string from successfully parsed BIC object
+                resulting_line = resulting_line[:index] + bic.compact + resulting_line[end_index:]
+            except:
+                pass
 
-            if not skip_spaces_until_number_of_characters_read:
-                resulting_line += token
-            else:
-                for character in token:
-                    if character != ' ' or not skip_spaces_until_number_of_characters_read:
-                        resulting_line += character
-                        skip_spaces_until_number_of_characters_read -= 1
+            # replace iban
+            index = match.span(1)[0]
+            
+            # try to parse iban of variable length - can be up to 32 dependening on the country code
+            # worst case a space after each character -> check lengths up to 64
+            for length in range(2, 64+1):
+                try:
+                    # raises exception if IBAN can not be parsed
+                    iban = schwifty.IBAN(resulting_line[index:index+length])
 
-            is_first_token = False
+                    # replace IBAN string with compact string from successfully parsed IBAN object
+                    resulting_line = resulting_line[:index] + iban.compact + resulting_line[index+length:]
+
+                    break
+                except:
+                    pass
 
         return resulting_line
 
