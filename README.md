@@ -1,6 +1,6 @@
 # IBANBICFilter
 
-a command line filter to normalize IBAN / BIC outputted by some bank APIs.
+A command line filter to normalize IBAN / BIC outputted by some bank APIs.
 
 ```
 Testcase input lines:
