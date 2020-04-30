@@ -1,0 +1,4 @@
+;"Some transation information... IBAN: DE8712345678 1234567890 BIC: COBADEHD05 5";
+;"Some transation information... IBAN: D E87123456781234567890 BIC: C OBADEHD055";
+;"Some transation information... IBAN: DE8712345678 1234567890 BIC: V OBADESS";
+;"Some transation information... IBAN: DE8712345678 1234567890 BIC: VOBADES S";"

@@ -51,6 +51,6 @@ if __name__ == '__main__':
     while True:
         try:
             print(ibanBICFilter.filter(input()))
-        except:
+        except EOFError:
             break
 
